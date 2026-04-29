@@ -1,0 +1,15 @@
+langchain-agent
+IPython
+dotenv
+langchain
+langchain-openai
+langchain-ollama
+python-dotenv
+langgraph
+langchain-chroma
+langchain-community
+pypdf
+langchain-text-splitters
+LangGraph
+streamlit
+ddgs

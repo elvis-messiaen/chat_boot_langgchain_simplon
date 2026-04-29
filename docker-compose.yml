@@ -1,0 +1,34 @@
+services:
+
+  # Service Ollama — tourne le LLM et les embeddings en local
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persistance des modèles téléchargés entre les relances
+      - ollama_data:/root/.ollama
+
+  # Service Streamlit — l'application RAG
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: chat-referentiel-ollama
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      # "ollama" = nom du service ci-dessus, résolu automatiquement par Docker
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    volumes:
+      # Persistance de la base Chroma entre les relances
+      - ./chroma_langchain_db_ollama:/app/chroma_langchain_db_ollama
+      - ./data:/app/data
+
+volumes:
+  ollama_data:
