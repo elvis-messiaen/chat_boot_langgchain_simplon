@@ -167,6 +167,28 @@ Basic_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 # Variable globale pour rendre retrieval_chain accessible depuis noeud_rag
 retrieval_chain = None
 
+# Fonction d'ajout de fichier — accepte .py, .pdf, .txt, .md via drag and drop Streamlit
+def ajout_fichier():
+    # Widget Streamlit de dépôt de fichier — drag and drop natif
+    fichier = st.file_uploader(
+        "Ajouter un fichier (optionnel)",
+        type=["py", "pdf", "txt", "md"],
+        label_visibility="collapsed"
+    )
+
+    # Si aucun fichier déposé, on retourne None
+    if fichier is None:
+        return None
+
+    # Traitement spécifique pour les PDF — extraction du texte page par page
+    if fichier.type == "application/pdf":
+        import pdfplumber
+        with pdfplumber.open(fichier) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    # Pour .py, .txt, .md — lecture directe du contenu texte
+    return fichier.read().decode("utf-8")
+
 # Fonction principale qui orchestre toutes les étapes et lance le chatbot
 def mise_en_fonction():
     # retrieval_chain est déclarée globalement pour être accessible depuis noeud_rag
@@ -191,6 +213,9 @@ def mise_en_fonction():
 
     # Bouton grisé si le champ est vide, actif dès qu'une lettre est tapée
     analyser = st.button("Analyser", disabled=not bool(question))
+
+    # Appel du widget d'upload — retourne le contenu du fichier ou None si aucun fichier déposé
+    contenu_fichier = ajout_fichier()
 
     # Chemin du dossier de persistance Chroma
     CHROMA_DIR = "./chroma_langchain_db"
@@ -239,6 +264,12 @@ def mise_en_fonction():
         if st.session_state.contexte_selectionne:
             question_complete = f"Contexte de la réponse précédente : {st.session_state.contexte_selectionne}\n\nNouvelle question : {question}"
 
+        # Si un fichier a été déposé, on ajoute son contenu à la question pour enrichir le contexte
+        # Troncature à 3000 caractères pour ne pas dépasser la fenêtre de contexte du LLM
+        if contenu_fichier:
+            contenu_tronque = contenu_fichier[:3000]
+            question_complete += f"\n\nContenu du fichier fourni :\n{contenu_tronque}"
+
         # Spinner affiché pendant le traitement pour indiquer que la requête est en cours
         with st.spinner("Analyse de votre demande en cours..."):
             # Invocation du graphe LangGraph avec la question enrichie du contexte si disponible
@@ -262,6 +293,8 @@ def mise_en_fonction():
     # le dernier échange s'ouvre automatiquement, les anciens restent repliés
     for i, echange in enumerate(st.session_state.historique):
         with st.expander(f"Question {i+1}", expanded=(i == len(st.session_state.historique) - 1)):
+            # Affichage de la question posée par l'utilisateur
+            st.markdown(f"**{echange['question']}**")
             # Affichage de la réponse à l'intérieur du bloc déplié
             st.write(echange['reponse'])
             # Bouton pour sélectionner cette réponse comme contexte de la prochaine question
