@@ -120,3 +120,17 @@ Question utilisateur → Retriever (MMR, k=10) → Chunks pertinents
 - Pour forcer une réindexation, supprimer le dossier `chroma_langchain_db_ollama/` et relancer
 - La mémoire de conversation repart à zéro à chaque redémarrage (stockage en RAM via LangGraph)
 - Les modèles Ollama sont volumineux (`llama3.2` ≈ 2 Go, `nomic-embed-text` ≈ 274 Mo) — prévoir du temps au premier téléchargement
+
+---
+
+## Déploiement cloud
+
+Cette version est conçue pour un usage **100% local**. Elle n'est pas adaptée à un déploiement cloud pour les raisons suivantes :
+
+| Raison | Détail |
+|---|---|
+| Ressources GPU | Ollama nécessite un GPU ou beaucoup de RAM pour tourner correctement — coûteux sur Azure |
+| Architecture Docker Compose | Deux services (app + ollama) à orchestrer — incompatible avec Azure App Service simple |
+| Confidentialité | L'intérêt principal de cette version est de garder les données en local |
+
+**Pour déployer sur Azure**, utilise la version OpenAI (`main.py`) — voir le fichier `README.md` pour le guide complet de déploiement pas à pas.

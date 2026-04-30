@@ -151,6 +151,115 @@ Question utilisateur → Retriever (MMR, k=10) → Chunks pertinents
 ---
 ---
 
-## Lancement avec Ollama (en cours d'implémentation)
+## Déploiement sur Azure (App Service)
 
-> Section à compléter après mise en place du `docker-compose.yml`
+### Prérequis
+- Azure CLI installé : `brew install azure-cli`
+- Docker Desktop installé et lancé
+- Un compte Azure avec un groupe de ressources disponible
+- Ta clé API OpenAI
+
+### Étape 1 — Connexion à Azure
+
+```bash
+az login
+```
+
+Un navigateur s'ouvre, connecte-toi avec ton compte Azure. Appuie sur Entrée pour valider la subscription par défaut.
+
+### Étape 2 — Créer un Container Registry dans le portail Azure
+
+1. Dans la barre de recherche Azure, tape **"Container Registry"**
+2. Clique sur **"Container registries"** → **"+ Créer"**
+3. Remplis :
+   - Groupe de ressources : ton groupe existant
+   - Nom du registre : `<tonnom>chatbot` (alphanumérique uniquement, 5-50 caractères)
+   - Région : France Central
+   - SKU : Basic
+   - Mode d'autorisation : **Autorisations du Registre RBAC**
+4. Clique sur **"Vérifier + créer"** puis **"Créer"**
+
+### Étape 3 — Récupérer les identifiants du registry
+
+1. Dans ton Container Registry → **"Clés d'accès"**
+2. Active **"Utilisateur administrateur"**
+3. Note : le **serveur de connexion**, le **nom d'utilisateur** et le **mot de passe**
+
+### Étape 4 — Connecter Docker au registry
+
+```bash
+docker login <serveur-de-connexion>
+```
+
+Saisis le nom d'utilisateur et le mot de passe notés à l'étape précédente.
+
+### Étape 5 — Builder l'image (AMD64 obligatoire sur Apple Silicon)
+
+```bash
+docker build --platform linux/amd64 -t <serveur-de-connexion>/chatbot-referentiel:latest .
+```
+
+> **Important** : le flag `--platform linux/amd64` est obligatoire sur Mac Apple Silicon (M1/M2/M3).
+> Sans ce flag, l'image est ARM et Azure retourne une erreur `exec format error`.
+
+### Étape 6 — Pousser l'image vers Azure
+
+```bash
+docker push <serveur-de-connexion>/chatbot-referentiel:latest
+```
+
+### Étape 7 — Créer l'App Service dans le portail Azure
+
+1. Dans la barre de recherche Azure, tape **"App Services"**
+2. Clique sur **"App Services"** → **"+ Créer"** → **"Application web"**
+3. Remplis :
+   - Groupe de ressources : ton groupe
+   - Nom : `chatbot-referentiel`
+   - Publier : **Conteneur**
+   - Système d'exploitation : **Linux**
+   - Région : **France Central**
+   - Plan de tarification : **B1** (le moins cher compatible Docker, ~13 USD/mois)
+4. Clique sur **"Vérifier + créer"** puis **"Créer"**
+
+### Étape 8 — Configurer le conteneur
+
+1. Dans l'App Service → **"Centre de déploiement"**
+2. Clique sur **"main"** dans la liste
+3. Remplis :
+   - Source de l'image : **Azure Container Registry**
+   - Registre : ton registry
+   - Authentification : **Informations d'identification de l'administrateur**
+   - Image : `chatbot-referentiel`
+   - Balise d'image : `latest`
+   - Port : **8501**
+   - Commande de démarrage : laisser vide
+4. Clique sur **"Appliquer"**
+
+### Étape 9 — Configurer les variables d'environnement
+
+1. Dans l'App Service → **"Paramètres"** → **"Variables d'environnement"**
+2. Ajoute ces deux variables via **"+ Ajouter"** :
+
+| Variable | Valeur |
+|---|---|
+| `OPENAI_API_KEY` | Ta clé API OpenAI |
+| `FILE_PATH` | `data/Referentiel.pdf` |
+
+3. Clique sur **"Appliquer"** puis **"Confirmer"**
+
+### Étape 10 — Redémarrer et accéder à l'application
+
+1. Dans l'App Service → **"Vue d'ensemble"** → **"Redémarrer"**
+2. Attends 2 à 5 minutes au premier démarrage (téléchargement de l'image)
+3. Clique sur le **"Domaine par défaut"** pour ouvrir l'application
+
+En cas d'erreur au démarrage, consulte les logs dans **"Supervision"** → **"Flux de journaux"**.
+
+### Mettre à jour l'application après modification du code
+
+```bash
+docker build --platform linux/amd64 -t <serveur-de-connexion>/chatbot-referentiel:latest .
+docker push <serveur-de-connexion>/chatbot-referentiel:latest
+```
+
+Puis dans le portail Azure → App Service → **"Redémarrer"**.
